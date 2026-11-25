@@ -1,0 +1,40 @@
+name: Compilar APK
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar SDK de Android
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-25" \
+            "build-tools;24.0.0" \
+            "extras;android;m2repository" \
+            "extras;google;m2repository"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 8
+
+      - name: Descargar Gradle 2.14.1
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
+          unzip -q gradle-2.14.1-bin.zip -d $HOME
+
+      - name: Compilar
+        run: |
+          $HOME/gradle-2.14.1/bin/gradle --no-daemon assembleAospDebug
+
+      - name: Subir APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Launcher3-Pixel-v1.0-cajon-negro
+          path: build/outputs/apk/*.apk
