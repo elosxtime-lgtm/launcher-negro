@@ -124,8 +124,6 @@ public class IconCache {
 
         mIconProvider = IconProvider.loadByName(context.getString(R.string.icon_provider_class),
                 context);
-        // Initialize the icon pack manager on the icon provider.
-        mIconProvider.setContext(context);
 
         mWorkerHandler = new Handler(LauncherModel.getWorkerLooper());
 
@@ -193,6 +191,18 @@ public class IconCache {
     }
 
     /**
+     * Discards every cached icon, in memory and in the persistent DB, so that they are rebuilt
+     * the next time they are needed (for example after the selected icon pack changed).
+     */
+    public synchronized void clearAllIcons() {
+        // Cancel the pending icon updates, they would restore icons of the previous icon pack.
+        mWorkerHandler.removeCallbacksAndMessages(ICON_UPDATE_TOKEN);
+        mIconProvider.updateSystemStateString();
+        mCache.clear();
+        mIconDb.delete(null, null);
+    }
+
+    /**
      * Remove any records for the supplied ComponentName.
      */
     public synchronized void remove(ComponentName componentName, UserHandleCompat user) {
@@ -242,15 +252,6 @@ public class IconCache {
         mIconDb.delete(
                 IconDB.COLUMN_COMPONENT + " LIKE ? AND " + IconDB.COLUMN_USER + " = ?",
                 new String[]{packageName + "/%", Long.toString(userSerial)});
-    }
-
-    /**
-     * Clears all cached icons (both in-memory and persistent). Used when the active icon pack
-     * changes, so that icons are regenerated with the new pack.
-     */
-    public synchronized void clearIconCache() {
-        mCache.clear();
-        mIconDb.delete(null, null);
     }
 
     public void updateDbIcons(Set<String> ignorePackagesForMainUser) {

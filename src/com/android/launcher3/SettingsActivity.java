@@ -17,15 +17,17 @@
 package com.android.launcher3;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentResolver;
+import android.content.DialogInterface;
 import android.database.ContentObserver;
 import android.os.Bundle;
 import android.os.Handler;
-import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.provider.Settings;
 import android.provider.Settings.System;
+import android.text.TextUtils;
 
 import java.util.List;
 
@@ -76,43 +78,92 @@ public class SettingsActivity extends Activity {
                 rotationPref.setDefaultValue(Utilities.getAllowRotationDefaultValue(getActivity()));
             }
 
-            // Setup icon pack preference
             setupIconPackPreference();
         }
 
+        /**
+         * Shows the selected icon pack and lets the user pick another one.
+         */
         private void setupIconPackPreference() {
-            final ListPreference iconPackPref = (ListPreference)
-                    findPreference(IconPackManager.ICON_PACK_PREF_KEY);
+            final Preference iconPackPref = findPreference(IconPackManager.PREF_ICON_PACK);
             if (iconPackPref == null) {
                 return;
             }
-
-            IconPackManager iconPackManager = new IconPackManager(getActivity());
-            List<IconPackManager.IconPackInfo> packs = iconPackManager.getInstalledIconPacks();
-
-            CharSequence[] entries = new CharSequence[packs.size() + 1];
-            CharSequence[] values = new CharSequence[packs.size() + 1];
-            entries[0] = getString(R.string.icon_pack_default);
-            values[0] = IconPackManager.DEFAULT_ICON_PACK;
-            for (int i = 0; i < packs.size(); i++) {
-                IconPackManager.IconPackInfo info = packs.get(i);
-                entries[i + 1] = info.label;
-                values[i + 1] = info.packageName;
-            }
-            iconPackPref.setEntries(entries);
-            iconPackPref.setEntryValues(values);
-
-            iconPackPref.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            updateIconPackSummary(iconPackPref);
+            iconPackPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
                 @Override
-                public boolean onPreferenceChange(Preference preference, Object newValue) {
-                    LauncherAppState app = LauncherAppState.getInstanceNoCreate();
-                    if (app != null) {
-                        app.getIconCache().clearIconCache();
-                        app.getModel().forceReload();
-                    }
+                public boolean onPreferenceClick(Preference preference) {
+                    showIconPackDialog(iconPackPref);
                     return true;
                 }
             });
+        }
+
+        private void updateIconPackSummary(Preference iconPackPref) {
+            IconPackManager manager = IconPackManager.getInstance(getActivity());
+            CharSequence label = manager.getPackLabel(manager.getSelectedPack());
+            iconPackPref.setSummary(label != null
+                    ? label : getString(R.string.icon_pack_summary_default));
+        }
+
+        private void showIconPackDialog(final Preference iconPackPref) {
+            final Activity activity = getActivity();
+            final IconPackManager manager = IconPackManager.getInstance(activity);
+            final List<IconPackManager.IconPackInfo> packs = manager.getInstalledPacks();
+
+            if (packs.isEmpty()) {
+                new AlertDialog.Builder(activity)
+                        .setTitle(R.string.icon_pack_title)
+                        .setMessage(R.string.icon_pack_none_found)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show();
+                return;
+            }
+
+            // The first option restores the original icons of the launcher.
+            CharSequence[] names = new CharSequence[packs.size() + 1];
+            names[0] = getString(R.string.icon_pack_default_option);
+            String selected = manager.getSelectedPack();
+            int checkedItem = 0;
+            for (int i = 0; i < packs.size(); i++) {
+                names[i + 1] = packs.get(i).label;
+                if (TextUtils.equals(packs.get(i).packageName, selected)) {
+                    checkedItem = i + 1;
+                }
+            }
+
+            new AlertDialog.Builder(activity)
+                    .setTitle(R.string.icon_pack_dialog_title)
+                    .setSingleChoiceItems(names, checkedItem,
+                            new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    applyIconPack(iconPackPref,
+                                            which == 0 ? "" : packs.get(which - 1).packageName);
+                                    dialog.dismiss();
+                                }
+                            })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+        }
+
+        /**
+         * Stores the new icon pack and rebuilds the icons of the home screen and all apps.
+         * The launcher picks the new icons up when the user goes back to it.
+         */
+        private void applyIconPack(Preference iconPackPref, String packageName) {
+            IconPackManager manager = IconPackManager.getInstance(getActivity());
+            if (TextUtils.equals(manager.getSelectedPack(), packageName)) {
+                return;
+            }
+            manager.setSelectedPack(packageName);
+
+            LauncherAppState app = LauncherAppState.getInstanceNoCreate();
+            if (app != null) {
+                app.getIconCache().clearAllIcons();
+                app.getModel().forceReload();
+            }
+            updateIconPackSummary(iconPackPref);
         }
 
         @Override

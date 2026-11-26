@@ -106,4 +106,11 @@
     <string name="shortcuts_menu_description" msgid="406159963824238648">"<xliff:g id="NUMBER_OF_SHORTCUTS">%1$d</xliff:g> accesos directos para <xliff:g id="APP_NAME">%2$s</xliff:g>"</string>
     <string name="label_search">Buscar</string>
     <string name="week_day_format">%1$s, %2$s</string>
+
+    <!-- Icon packs -->
+    <string name="icon_pack_title">Paquete de iconos</string>
+    <string name="icon_pack_summary_default">Iconos originales</string>
+    <string name="icon_pack_default_option">Iconos originales</string>
+    <string name="icon_pack_dialog_title">Elegir un paquete de iconos</string>
+    <string name="icon_pack_none_found">No se encontraron paquetes de iconos. Instala uno compatible con ADW, Nova o Apex e inténtalo de nuevo.</string>
 </resources>

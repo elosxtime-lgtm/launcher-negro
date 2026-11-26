@@ -17,28 +17,20 @@ public class IconProvider {
 
     protected String mSystemState;
 
+    // Used to look up the icons of the selected icon pack. Null if not available.
     private Context mContext;
-    private IconPackManager mIconPackManager;
 
     public IconProvider() {
         updateSystemStateString();
     }
 
     public IconProvider(Context context) {
-        this();
-        setContext(context);
-    }
-
-    /**
-     * Initializes the icon pack manager from the given context.
-     */
-    public void setContext(Context context) {
-        mContext = context;
-        mIconPackManager = new IconPackManager(context);
+        mContext = context.getApplicationContext();
+        updateSystemStateString();
     }
 
     public static IconProvider loadByName(String className, Context context) {
-        if (TextUtils.isEmpty(className)) return new IconProvider();
+        if (TextUtils.isEmpty(className)) return new IconProvider(context);
         if (DBG) Log.d(TAG, "Loading IconProvider: " + className);
         try {
             Class<?> cls = Class.forName(className);
@@ -46,12 +38,19 @@ public class IconProvider {
         } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
                 | ClassCastException | NoSuchMethodException | InvocationTargetException e) {
             Log.e(TAG, "Bad IconProvider class", e);
-            return new IconProvider();
+            return new IconProvider(context);
         }
     }
 
     public void updateSystemStateString() {
         mSystemState = Locale.getDefault().toString();
+        if (mContext != null) {
+            // The selected icon pack is part of the state, so the icons stored in the icon
+            // cache are rebuilt whenever the icon pack changes.
+            IconPackManager iconPacks = IconPackManager.getInstance(mContext);
+            iconPacks.invalidate();
+            mSystemState += iconPacks.getStateString();
+        }
     }
 
     public String getIconSystemState(String packageName) {
@@ -60,11 +59,11 @@ public class IconProvider {
 
 
     public Drawable getIcon(LauncherActivityInfoCompat info, int iconDpi) {
-        if (mIconPackManager != null) {
-            Drawable iconPackIcon = mIconPackManager.getDrawableForComponent(
-                    info.getComponentName(), iconDpi);
-            if (iconPackIcon != null) {
-                return iconPackIcon;
+        if (mContext != null) {
+            Drawable packIcon = IconPackManager.getInstance(mContext)
+                    .getIcon(info.getComponentName(), iconDpi);
+            if (packIcon != null) {
+                return packIcon;
             }
         }
         return info.getIcon(iconDpi);

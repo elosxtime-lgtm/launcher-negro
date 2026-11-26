@@ -23,12 +23,11 @@
             android:persistent="true"
     />
 
-    <ListPreference
-            android:key="pref_icon_pack"
+    <Preference
+            android:key="pref_iconPack"
             android:title="@string/icon_pack_title"
-            android:summary="@string/icon_pack_summary"
-            android:defaultValue=""
-            android:persistent="true"
+            android:summary="@string/icon_pack_summary_default"
+            android:persistent="false"
     />
 
 </PreferenceScreen>
