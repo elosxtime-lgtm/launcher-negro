@@ -17,8 +17,24 @@ public class IconProvider {
 
     protected String mSystemState;
 
+    private Context mContext;
+    private IconPackManager mIconPackManager;
+
     public IconProvider() {
         updateSystemStateString();
+    }
+
+    public IconProvider(Context context) {
+        this();
+        setContext(context);
+    }
+
+    /**
+     * Initializes the icon pack manager from the given context.
+     */
+    public void setContext(Context context) {
+        mContext = context;
+        mIconPackManager = new IconPackManager(context);
     }
 
     public static IconProvider loadByName(String className, Context context) {
@@ -44,6 +60,13 @@ public class IconProvider {
 
 
     public Drawable getIcon(LauncherActivityInfoCompat info, int iconDpi) {
+        if (mIconPackManager != null) {
+            Drawable iconPackIcon = mIconPackManager.getDrawableForComponent(
+                    info.getComponentName(), iconDpi);
+            if (iconPackIcon != null) {
+                return iconPackIcon;
+            }
+        }
         return info.getIcon(iconDpi);
     }
 }

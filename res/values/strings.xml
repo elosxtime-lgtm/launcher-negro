@@ -161,6 +161,14 @@
     <!-- Text explaining that rotation is disabled in Display settings. 'Display' refers to the Display section in system settings [CHAR LIMIT=100] -->
     <string name="allow_rotation_blocked_desc">Current Display setting doesn\'t permit rotation</string>
 
+    <!-- Strings for icon packs -->
+    <!-- Title for the icon pack setting. -->
+    <string name="icon_pack_title">Icon pack</string>
+    <!-- Summary for the icon pack setting. -->
+    <string name="icon_pack_summary">Choose an icon pack for the home screen and app drawer</string>
+    <!-- Label for the default (system) icons option. -->
+    <string name="icon_pack_default">Original icons</string>
+
     <!-- Label on an icon that references an uninstalled package, for which we have no information about when it might be installed. [CHAR_LIMIT=15] -->
     <string name="package_state_unknown">Unknown</string>
 
@@ -262,6 +270,4 @@
     <!-- Pixel -->
     <string name="label_search">Search</string>
     <string name="week_day_format">%1$s, %2$s</string>
-    <string name="icon_pack_title">Icon pack</string>
-    <string name="icon_pack_default">Original icons</string>
 </resources>

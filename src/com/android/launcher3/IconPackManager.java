@@ -1,108 +1,238 @@
+/*
+ * Copyright (C) 2016 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package com.android.launcher3;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.ApplicationInfo;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
+import android.content.res.XmlResourceParser;
 import android.graphics.drawable.Drawable;
-import android.preference.PreferenceManager;
 import android.text.TextUtils;
-import android.util.Xml;
+import android.util.Log;
 
 import org.xmlpull.v1.XmlPullParser;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
-/** Minimal ADW/Nova-compatible icon pack reader. */
-final class IconPackManager {
-    static final String PREF_PACKAGE = "pref_icon_pack_package";
-    static final String PREF_LABEL = "pref_icon_pack_label";
-    private static final String APPFILTER = "appfilter";
-    private final Context context;
-    private final PackageManager pm;
-    private String loadedPackage;
-    private Map<String, String> icons = new HashMap<String, String>();
+/**
+ * Manages the detection and application of icon packs.
+ *
+ * An icon pack is an app that exposes a "theme" activity (intent MAIN + category
+ * {@code com.fede.launcher.THEME_ICONPACK} or {@code org.adw.launcher.THEME_ICONPACK})
+ * and provides an {@code appfilter.xml} mapping components to drawables.
+ */
+public class IconPackManager {
 
-    IconPackManager(Context context) {
-        this.context = context.getApplicationContext();
-        pm = context.getPackageManager();
+    private static final String TAG = "IconPackManager";
+
+    public static final String ICON_PACK_PREF_KEY = "pref_icon_pack";
+    public static final String DEFAULT_ICON_PACK = "";
+
+    private static final String CATEGORY_ICON_PACK_FEDE = "com.fede.launcher.THEME_ICONPACK";
+    private static final String CATEGORY_ICON_PACK_ADW = "org.adw.launcher.THEME_ICONPACK";
+    private static final String[] ICON_PACK_CATEGORIES = {
+            CATEGORY_ICON_PACK_FEDE, CATEGORY_ICON_PACK_ADW
+    };
+    private static final String[] ICON_PACK_METADATA_KEYS = {
+            CATEGORY_ICON_PACK_FEDE, CATEGORY_ICON_PACK_ADW
+    };
+
+    private final Context mContext;
+    private final PackageManager mPackageManager;
+
+    // Cached state for the currently selected icon pack.
+    private String mCurrentIconPack;
+    private Resources mIconPackResources;
+    private HashMap<String, String> mComponentToDrawable;
+
+    public IconPackManager(Context context) {
+        mContext = context;
+        mPackageManager = context.getPackageManager();
     }
 
-    static final class Pack {
-        final String packageName;
-        final String label;
-        Pack(String p, String l) { packageName = p; label = l; }
-        @Override public String toString() { return label; }
+    private SharedPreferences getPrefs() {
+        return mContext.getSharedPreferences(
+                LauncherFiles.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE);
     }
 
-    List<Pack> getInstalledPacks() {
-        List<Pack> result = new ArrayList<Pack>();
-        for (ApplicationInfo app : pm.getInstalledApplications(0)) {
-            try {
-                Resources r = pm.getResourcesForApplication(app);
-                if (r.getIdentifier(APPFILTER, "xml", app.packageName) != 0) {
-                    CharSequence label = pm.getApplicationLabel(app);
-                    result.add(new Pack(app.packageName, label == null ? app.packageName : label.toString()));
+    /**
+     * @return the package name of the selected icon pack, or an empty string for default icons.
+     */
+    public String getSelectedIconPack() {
+        return getPrefs().getString(ICON_PACK_PREF_KEY, DEFAULT_ICON_PACK);
+    }
+
+    /**
+     * @return the list of installed icon packs.
+     */
+    public List<IconPackInfo> getInstalledIconPacks() {
+        List<IconPackInfo> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String category : ICON_PACK_CATEGORIES) {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.addCategory(category);
+            List<ResolveInfo> resolveInfos =
+                    mPackageManager.queryIntentActivities(intent, 0);
+            if (resolveInfos == null) {
+                continue;
+            }
+            for (ResolveInfo ri : resolveInfos) {
+                if (ri.activityInfo == null) {
+                    continue;
                 }
-            } catch (Exception ignored) { }
+                String pkg = ri.activityInfo.packageName;
+                if (seen.add(pkg)) {
+                    result.add(new IconPackInfo(ri, mPackageManager));
+                }
+            }
         }
         return result;
     }
 
-    synchronized Drawable getIcon(ComponentName component) {
-        String pack = context.getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY,
-                Context.MODE_PRIVATE).getString(PREF_PACKAGE, "");
-        if (TextUtils.isEmpty(pack) || component == null) return null;
-        if (!pack.equals(loadedPackage)) loadPack(pack);
-        String drawableName = icons.get(component.flattenToString());
-        if (drawableName == null) drawableName = icons.get(component.getPackageName());
-        if (drawableName == null) return null;
+    /**
+     * Returns the icon pack drawable for the given component, or null if none is available.
+     */
+    public Drawable getDrawableForComponent(ComponentName component, int iconDpi) {
+        String selected = getSelectedIconPack();
+        if (TextUtils.isEmpty(selected)) {
+            return null;
+        }
+        if (!selected.equals(mCurrentIconPack)) {
+            loadIconPack(selected);
+        }
+        if (mComponentToDrawable == null || mIconPackResources == null) {
+            return null;
+        }
+        String drawableName = mComponentToDrawable.get(component.flattenToShortString());
+        if (drawableName == null) {
+            return null;
+        }
+        int id = mIconPackResources.getIdentifier(drawableName, "drawable", selected);
+        if (id == 0) {
+            return null;
+        }
         try {
-            Resources r = pm.getResourcesForApplication(pack);
-            int id = r.getIdentifier(drawableName, "drawable", pack);
-            if (id == 0) id = r.getIdentifier(drawableName, "mipmap", pack);
-            return id == 0 ? null : r.getDrawable(id);
-        } catch (Exception e) { return null; }
+            return mIconPackResources.getDrawableForDensity(id, iconDpi);
+        } catch (Exception e) {
+            Log.e(TAG, "Error loading drawable " + drawableName, e);
+            return null;
+        }
     }
 
-    private void loadPack(String packageName) {
-        loadedPackage = packageName;
-        icons = new HashMap<String, String>();
-        InputStream in = null;
+    private void loadIconPack(String packageName) {
+        mCurrentIconPack = packageName;
+        mComponentToDrawable = null;
+        mIconPackResources = null;
+
         try {
-            Resources r = pm.getResourcesForApplication(packageName);
-            int id = r.getIdentifier(APPFILTER, "xml", packageName);
-            if (id == 0) return;
-            in = r.openRawResource(id);
-            XmlPullParser parser = Xml.newPullParser();
-            parser.setInput(in, "UTF-8");
-            int event;
-            while ((event = parser.next()) != XmlPullParser.END_DOCUMENT) {
-                if (event != XmlPullParser.START_TAG || !"item".equals(parser.getName())) continue;
-                String component = parser.getAttributeValue(null, "component");
-                String drawable = parser.getAttributeValue(null, "drawable");
-                if (component == null || drawable == null) continue;
-                if (component.startsWith("ComponentInfo{") && component.endsWith("}")) {
-                    component = component.substring(14, component.length() - 1);
-                    int slash = component.indexOf('/');
-                    if (slash > 0) {
-                        String pkg = component.substring(0, slash);
-                        String cls = component.substring(slash + 1);
-                        if (cls.startsWith(".")) cls = pkg + cls;
-                        icons.put(new ComponentName(pkg, cls).flattenToString(), drawable);
-                        icons.put(pkg, drawable);
+            mIconPackResources = mPackageManager.getResourcesForApplication(packageName);
+        } catch (NameNotFoundException e) {
+            Log.d(TAG, "Icon pack not found: " + packageName);
+            return;
+        }
+
+        int filterResId = findAppFilterResource(packageName);
+        if (filterResId != 0) {
+            parseAppFilter(filterResId);
+        }
+    }
+
+    private int findAppFilterResource(String packageName) {
+        ActivityInfo ai = getIconPackActivity(packageName);
+        if (ai != null && ai.metaData != null) {
+            for (String key : ICON_PACK_METADATA_KEYS) {
+                int resId = ai.metaData.getInt(key, 0);
+                if (resId != 0) {
+                    return resId;
+                }
+            }
+        }
+        // Fallback: look for res/xml/appfilter.xml
+        return mIconPackResources.getIdentifier("appfilter", "xml", packageName);
+    }
+
+    private ActivityInfo getIconPackActivity(String packageName) {
+        for (String category : ICON_PACK_CATEGORIES) {
+            Intent intent = new Intent(Intent.ACTION_MAIN);
+            intent.setPackage(packageName);
+            intent.addCategory(category);
+            List<ResolveInfo> resolveInfos =
+                    mPackageManager.queryIntentActivities(intent, PackageManager.GET_META_DATA);
+            if (resolveInfos != null && !resolveInfos.isEmpty()
+                    && resolveInfos.get(0).activityInfo != null) {
+                return resolveInfos.get(0).activityInfo;
+            }
+        }
+        return null;
+    }
+
+    private void parseAppFilter(int resId) {
+        XmlResourceParser parser = null;
+        try {
+            parser = mIconPackResources.getXml(resId);
+            int type;
+            while ((type = parser.next()) != XmlPullParser.END_DOCUMENT) {
+                if (type == XmlPullParser.START_TAG && "item".equals(parser.getName())) {
+                    String component = parser.getAttributeValue(null, "component");
+                    String drawable = parser.getAttributeValue(null, "drawable");
+                    if (component != null && drawable != null) {
+                        int start = component.indexOf('{');
+                        int end = component.indexOf('}');
+                        if (start >= 0 && end > start) {
+                            component = component.substring(start + 1, end);
+                        }
+                        if (mComponentToDrawable == null) {
+                            mComponentToDrawable = new HashMap<>();
+                        }
+                        mComponentToDrawable.put(component, drawable);
                     }
                 }
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing appfilter", e);
         } finally {
-            if (in != null) try { in.close(); } catch (Exception ignored) { }
+            if (parser != null) {
+                parser.close();
+            }
+        }
+    }
+
+    /**
+     * Represents a single installed icon pack.
+     */
+    public static class IconPackInfo {
+        public final String packageName;
+        public final CharSequence label;
+        public final Drawable icon;
+
+        public IconPackInfo(ResolveInfo resolveInfo, PackageManager pm) {
+            packageName = resolveInfo.activityInfo.packageName;
+            label = resolveInfo.loadLabel(pm);
+            icon = resolveInfo.loadIcon(pm);
         }
     }
 }
