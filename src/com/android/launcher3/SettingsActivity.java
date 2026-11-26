@@ -17,12 +17,15 @@
 package com.android.launcher3;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentResolver;
 import android.database.ContentObserver;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.Preference;
 import android.preference.PreferenceFragment;
+import android.content.DialogInterface;
+import java.util.List;
 import android.provider.Settings;
 import android.provider.Settings.System;
 
@@ -52,6 +55,41 @@ public class SettingsActivity extends Activity {
             super.onCreate(savedInstanceState);
             getPreferenceManager().setSharedPreferencesName(LauncherFiles.SHARED_PREFERENCES_KEY);
             addPreferencesFromResource(R.xml.launcher_preferences);
+
+            Preference iconPackPref = findPreference("pref_icon_pack");
+            iconPackPref.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override public boolean onPreferenceClick(Preference preference) {
+                    final IconPackManager manager = new IconPackManager(getActivity());
+                    final List<IconPackManager.Pack> packs = manager.getInstalledPacks();
+                    final String[] labels = new String[packs.size() + 1];
+                    labels[0] = getString(R.string.icon_pack_default);
+                    for (int i = 0; i < packs.size(); i++) labels[i + 1] = packs.get(i).label;
+                    final android.content.SharedPreferences prefs = getActivity().getSharedPreferences(
+                            LauncherFiles.SHARED_PREFERENCES_KEY, android.content.Context.MODE_PRIVATE);
+                    final String selected = prefs.getString(IconPackManager.PREF_PACKAGE, "");
+                    int checked = 0;
+                    for (int i = 0; i < packs.size(); i++) if (packs.get(i).packageName.equals(selected)) checked = i + 1;
+                    new AlertDialog.Builder(getActivity()).setTitle(R.string.icon_pack_title)
+                            .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface dialog, int which) {
+                                    android.content.SharedPreferences.Editor editor = prefs.edit();
+                                    if (which == 0) editor.remove(IconPackManager.PREF_PACKAGE)
+                                            .remove(IconPackManager.PREF_LABEL);
+                                    else editor.putString(IconPackManager.PREF_PACKAGE, packs.get(which - 1).packageName)
+                                            .putString(IconPackManager.PREF_LABEL, packs.get(which - 1).label);
+                                    editor.apply();
+                                    LauncherAppState state = LauncherAppState.getInstance();
+                                    state.getIconCache().clearIconPackCache();
+                                    state.getModel().forceReload();
+                                    dialog.dismiss();
+                                }
+                            }).setNegativeButton(android.R.string.cancel, null).show();
+                    return true;
+                }
+            });
+            String currentPack = getActivity().getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY,
+                    android.content.Context.MODE_PRIVATE).getString(IconPackManager.PREF_LABEL, null);
+            iconPackPref.setSummary(currentPack == null ? R.string.icon_pack_default : currentPack);
 
             // Setup allow rotation preference
             Preference rotationPref = findPreference(Utilities.ALLOW_ROTATION_PREFERENCE_KEY);

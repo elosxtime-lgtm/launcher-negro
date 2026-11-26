@@ -491,7 +491,7 @@ public class Launcher extends Activity
             mWorkspace.getPageIndicator().updateColor(mExtractedColors);
             // It's possible that All Apps is visible when this is run,
             // so always use light status bar in that case.
-            activateLightStatusBar(false);
+            activateLightStatusBar(isAllAppsVisible());
         }
     }
 

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fondo de la ventana de carpeta abierta: gris oscuro #252525 (basado en quantum_panel_shape). -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
        android:shape="rectangle">
     <solid android:color="@color/dark_panel_bg_color" />

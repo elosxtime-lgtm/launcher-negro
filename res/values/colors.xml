@@ -31,6 +31,10 @@
     <color name="folder_edge_effect_color">#FF757575</color>
     <color name="page_indicator_dot_color">#FFDDDDDD</color>
 
+    <!-- Fondo gris oscuro compartido: cajon de apps y carpetas abiertas -->
+    <color name="dark_panel_bg_color">#FF252525</color>
+    <color name="dark_panel_text_color">#FFEEEEEE</color>
+    <color name="dark_panel_folder_name_color">#FFBBBBBB</color>
     <color name="quantum_panel_text_color">#FF666666</color>
     <color name="quantum_panel_bg_color">#FFF5F5F5</color>
 
@@ -38,7 +42,7 @@
     <color name="all_apps_divider_color">#1EFFFFFF</color>
     <color name="all_apps_caret_color">#FFFFFFFF</color>
     <color name="all_apps_caret_shadow_color">#22000000</color>
-    <color name="all_apps_container_color">#FF252525</color>
+    <color name="all_apps_container_color">@color/dark_panel_bg_color</color>
     <color name="all_apps_navbar_color">#28000000</color>
 
     <color name="spring_loaded_panel_color">#40FFFFFF</color>
@@ -50,11 +54,6 @@
 
     <!-- Used as a fallback since colorSecondary doesn't exist pre-API 25 -->
     <color name="fallback_secondary_color">#FF37474F</color>
-
-    <!-- Dark panel (all apps drawer and open folders) -->
-    <color name="dark_panel_bg_color">#FF252525</color>
-    <color name="dark_panel_text_color">#FFE0E0E0</color>
-    <color name="dark_panel_folder_name_color">#EEBDBDBD</color>
 
     <!-- Pixel -->
     <color name="qsb_connector">#fff2f2f2</color>

@@ -91,6 +91,7 @@ public class IconCache {
     private final Context mContext;
     private final PackageManager mPackageManager;
     private IconProvider mIconProvider;
+    private final IconPackManager mIconPackManager;
     @Thunk final UserManagerCompat mUserManager;
     private final LauncherAppsCompat mLauncherApps;
     private final HashMap<ComponentKey, CacheEntry> mCache =
@@ -115,6 +116,7 @@ public class IconCache {
     public IconCache(Context context, InvariantDeviceProfile inv) {
         mContext = context;
         mPackageManager = context.getPackageManager();
+        mIconPackManager = new IconPackManager(context);
         mUserManager = UserManagerCompat.getInstance(mContext);
         mLauncherApps = LauncherAppsCompat.getInstance(mContext);
         mIconDpi = inv.fillResIconDpi;
@@ -583,7 +585,20 @@ public class IconCache {
                 entry.contentDescription = mUserManager.getBadgedLabelForUser(entry.title, user);
             }
         }
+        // Apply the selected icon pack after reading the regular cache so changing packs
+        // never changes the launcher's labels or any other cached application metadata.
+        Drawable packedIcon = mIconPackManager.getIcon(componentName);
+        if (packedIcon != null) {
+            entry.icon = Utilities.createBadgedIconBitmap(packedIcon, user, mContext);
+            entry.isLowResIcon = false;
+        }
         return entry;
+    }
+
+    /** Clears in-memory icons after the selected icon pack changes. */
+    public synchronized void clearIconPackCache() {
+        mCache.clear();
+        mDefaultIcons.clear();
     }
 
     /**

@@ -507,8 +507,7 @@ public class FolderIcon extends FrameLayout implements FolderListener {
         // Expressed on a scale from 0 to 255.
         private static final int BG_OPACITY = 255;
         private static final int MAX_BG_OPACITY = 255;
-        // Closed folder background: fixed dark gray #252525
-        private static final int BG_INTENSITY = 0x25;
+        private static final int BG_INTENSITY = 0x25; // #252525
         private static final int SHADOW_OPACITY = 80;
 
         ValueAnimator mScaleAnimator;
@@ -615,7 +614,7 @@ public class FolderIcon extends FrameLayout implements FolderListener {
 
             paint.reset();
             paint.setAntiAlias(true);
-            paint.setColor(Color.argb(160, BG_INTENSITY, BG_INTENSITY, BG_INTENSITY));
+            paint.setColor(Color.argb(160, 245, 245, 245));
 
             float radius = getScaledRadius();
             canvas.drawCircle(radius, radius, radius, paint);

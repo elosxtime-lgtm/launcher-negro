@@ -22,7 +22,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    launcher:revealBackground="@drawable/dark_panel_shape">
+    launcher:revealBackground="@drawable/quantum_panel_shape">
 
     <View
         android:id="@+id/reveal_view"

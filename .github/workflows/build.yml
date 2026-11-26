@@ -1,0 +1,49 @@
+name: Compilar APK
+
+on:
+  workflow_dispatch:   # se ejecuta a mano desde la pestana Actions
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar SDK de Android 25 y build-tools 24.0.0
+        run: |
+          # sdkmanager necesita Java 17; el proyecto se compila despues con Java 8
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-25" "build-tools;24.0.0" "platform-tools"
+
+      - name: Descargar Gradle 2.14.1
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-2.14.1-bin.zip
+          unzip -q gradle-2.14.1-bin.zip -d "$HOME"
+
+      - name: Compilar (aospDebug)
+        run: |
+          export JAVA_HOME="$JAVA_HOME_8_X64"
+          export PATH="$JAVA_HOME/bin:$HOME/gradle-2.14.1/bin:$PATH"
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          java -version
+          gradle --no-daemon --stacktrace assembleAospDebug 2>&1 | tee build.log
+
+      - name: Guardar el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-apk
+          path: build/outputs/apk/*.apk
+          if-no-files-found: error
+
+      - name: Guardar el registro de compilacion
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log

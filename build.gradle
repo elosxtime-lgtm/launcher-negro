@@ -1,6 +1,8 @@
 buildscript {
     repositories {
         mavenCentral()
+        jcenter()
+        maven { url 'https://maven.google.com' }
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:2.1.3'
@@ -56,6 +58,9 @@ android {
 
 repositories {
     mavenCentral()
+    jcenter()
+    // Las librerias de soporte 23.x ya no vienen con el SDK nuevo: se descargan de Google Maven
+    maven { url 'https://maven.google.com' }
 }
 
 dependencies {

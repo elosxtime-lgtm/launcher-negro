@@ -143,17 +143,17 @@ public class ExtractedColors {
     /**
      * The hotseat's color is defined as follows:
      * - 12% black for super light wallpaper
-     * - 18% white for super dark
-     * - 25% white otherwise
+     * - 18% black for super dark
+     * - 25% black otherwise
      */
     public void updateHotseatPalette(Palette hotseatPalette) {
         int hotseatColor;
         if (hotseatPalette != null && ExtractionUtils.isSuperLight(hotseatPalette)) {
             hotseatColor = ColorUtils.setAlphaComponent(Color.BLACK, (int) (0.12f * 255));
         } else if (hotseatPalette != null && ExtractionUtils.isSuperDark(hotseatPalette)) {
-            hotseatColor = ColorUtils.setAlphaComponent(Color.WHITE, (int) (0.18f * 255));
+            hotseatColor = ColorUtils.setAlphaComponent(Color.BLACK, (int) (0.18f * 255));
         } else {
-            hotseatColor = ColorUtils.setAlphaComponent(Color.WHITE, (int) (0.25f * 255));
+            hotseatColor = ColorUtils.setAlphaComponent(Color.BLACK, (int) (0.25f * 255));
         }
         setColorAtIndex(HOTSEAT_INDEX, hotseatColor);
     }
